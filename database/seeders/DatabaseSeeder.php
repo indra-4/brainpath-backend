@@ -1,0 +1,22 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    /**
+     * Seed the application's database.
+     *
+     * Order matters: LearningPaths must exist before Courses.
+     */
+    public function run(): void
+    {
+        $this->call([
+            LearningPathSeeder::class,
+            CourseSeeder::class,
+            ChatbotRuleSeeder::class,
+        ]);
+    }
+}
