@@ -59,10 +59,6 @@ class User extends Authenticatable
         return $this->hasMany(UserProgress::class);
     }
 
-    public function interactions()
-    {
-        return $this->hasMany(UserInteraction::class);
-    }
 
     public function recommendationLogs()
     {

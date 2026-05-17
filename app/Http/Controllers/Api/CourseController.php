@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\InteractionRequest;
 use App\Http\Requests\ProgressRequest;
 use App\Models\Course;
-use App\Models\UserInteraction;
 use App\Models\UserProgress;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -87,28 +85,5 @@ class CourseController extends Controller
         }
 
         return $this->successResponse($progress, 'Progress updated successfully.');
-    }
-
-    /**
-     * POST /api/courses/{id}/interaction
-     */
-    public function logInteraction(InteractionRequest $request, int $id): JsonResponse
-    {
-        /** @var \App\Models\User $user */
-        $user   = Auth::user();
-        $course = Course::find($id);
-
-        if (! $course) {
-            return $this->errorResponse('Course not found.', null, 404);
-        }
-
-        $interaction = UserInteraction::create([
-            'user_id'            => $user->id,
-            'course_id'          => $course->id,
-            'action'             => $request->action,
-            'time_spent_seconds' => $request->time_spent_seconds ?? 0,
-        ]);
-
-        return $this->successResponse($interaction, 'Interaction logged successfully.', 201);
     }
 }

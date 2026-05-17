@@ -32,10 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Courses
     Route::prefix('courses')->group(function () {
-        Route::get('/',                       [CourseController::class, 'index']);
-        Route::get('/{id}',                   [CourseController::class, 'show']);
-        Route::post('/{id}/progress',         [CourseController::class, 'updateProgress']);
-        Route::post('/{id}/interaction',      [CourseController::class, 'logInteraction']);
+        Route::get('/',               [CourseController::class, 'index']);
+        Route::get('/{id}',           [CourseController::class, 'show']);
+        Route::post('/{id}/progress', [CourseController::class, 'updateProgress']);
     });
 
     // Recommendations (FastAPI ML bridge)
