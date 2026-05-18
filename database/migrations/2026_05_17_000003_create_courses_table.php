@@ -16,6 +16,7 @@ return new class extends Migration
             $table->json('tags')->nullable(); // JSONB on Postgres via json() type
             $table->integer('order_index')->default(0);
             $table->integer('duration_minutes')->default(0);
+            $table->text('skills')->nullable();
             $table->boolean('is_published')->default(false);
             $table->timestamps();
         });

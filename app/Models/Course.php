@@ -16,6 +16,7 @@ class Course extends Model
         'tags',
         'order_index',
         'duration_minutes',
+        'skills',
         'is_published',
     ];
 
