@@ -33,7 +33,7 @@ class OnboardingController extends Controller
         ]);
 
         // ── Step 2: Cold-start — call FastAPI with the interest string ─────────
-        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
         $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
 
         try {
@@ -52,7 +52,8 @@ class OnboardingController extends Controller
                 ], 'Onboarding completed. Recommendation service is currently unavailable.');
             }
 
-            $recommendations = $mlResponse->json() ?? [];
+            $mlJson           = $mlResponse->json();
+            $recommendations  = $mlJson['data'] ?? $mlJson ?? [];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('ML service connection failed during onboarding cold-start', [
                 'error' => $e->getMessage(),

@@ -30,7 +30,7 @@ class RecommendationController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
         $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
 
         // ── Step 1: Find most recently completed course ────────────────────────
@@ -77,14 +77,14 @@ class RecommendationController extends Controller
             return $this->errorResponse('Could not connect to the recommendation service.', null, 503);
         }
 
-        if (empty($mlData)) {
+        if (empty($mlData) || empty($mlData['data'])) {
             return $this->successResponse([], 'No recommendations returned from ML service.');
         }
 
         // ── Step 4: Map titles to DB courses and persist logs ─────────────────
         $recommendations = [];
 
-        foreach ($mlData as $item) {
+        foreach ($mlData['data'] as $item) {
             $title           = $item['title']            ?? null;
             $similarityScore = (float) ($item['similarity_score'] ?? 0.0);
 

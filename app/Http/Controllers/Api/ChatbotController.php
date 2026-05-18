@@ -21,12 +21,12 @@ class ChatbotController extends Controller
      */
     public function ask(ChatbotRequest $request): JsonResponse
     {
-        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
-        $mlUrl     = $mlBaseUrl . '/api/v1/chatbot';
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
+        $mlUrl     = $mlBaseUrl . '/api/v1/chat/ask';
 
         $payload = [
-            'message'   => $request->message,
-            'course_id' => $request->course_id, // nullable — forwarded as-is
+            'question'  => $request->message,
+            'sourcesID' => (int) $request->course_id, // ensure it's int for FastAPI
         ];
 
         try {
