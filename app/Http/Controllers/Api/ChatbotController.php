@@ -4,37 +4,48 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ChatbotRequest;
-use App\Models\ChatbotRule;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ChatbotController extends Controller
 {
     use ApiResponse;
 
-    private const FALLBACK_RESPONSE = 'Maaf, saya tidak mengerti pertanyaan Anda. Silakan coba kata kunci lain atau hubungi tim support kami untuk bantuan lebih lanjut.';
-
     /**
      * POST /api/chatbot
+     *
+     * Acts as an API Gateway: forwards the request to the FastAPI LLM
+     * chatbot endpoint and returns its response verbatim.
      */
-    public function reply(ChatbotRequest $request): JsonResponse
+    public function ask(ChatbotRequest $request): JsonResponse
     {
-        $userMessage = $request->message;
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
+        $mlUrl     = $mlBaseUrl . '/api/v1/chatbot';
 
-        // Find the highest-priority rule whose keyword appears in the user's message
-        $rule = ChatbotRule::where('is_active', true)
-                           ->whereRaw('? ILIKE CONCAT(\'%\', keyword, \'%\')', [$userMessage])
-                           ->orderByDesc('priority')
-                           ->first();
+        $payload = [
+            'message'   => $request->message,
+            'course_id' => $request->course_id, // nullable — forwarded as-is
+        ];
 
-        $reply    = $rule?->response ?? self::FALLBACK_RESPONSE;
-        $category = $rule?->category ?? 'fallback';
-        $matched  = $rule !== null;
+        try {
+            $mlResponse = Http::timeout(30)
+                              ->post($mlUrl, $payload);
 
-        return $this->successResponse([
-            'reply'    => $reply,
-            'category' => $category,
-            'matched'  => $matched,
-        ], 'Chatbot response generated.');
+            if (! $mlResponse->successful()) {
+                Log::warning('FastAPI chatbot returned non-200', [
+                    'status' => $mlResponse->status(),
+                    'body'   => $mlResponse->body(),
+                ]);
+                return $this->errorResponse('Chatbot service is currently unavailable.', null, 503);
+            }
+
+            // Return the ML service response verbatim
+            return response()->json($mlResponse->json(), $mlResponse->status());
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('FastAPI chatbot connection failed', ['error' => $e->getMessage()]);
+            return $this->errorResponse('Could not connect to the chatbot service.', null, 503);
+        }
     }
 }

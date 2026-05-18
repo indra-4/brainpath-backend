@@ -16,8 +16,7 @@ class OnboardingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'has_it_knowledge'  => ['required', 'boolean'],
-            'selected_interest' => ['required', 'string'],
+            'interest' => ['required', 'string', 'max:255'],
         ];
     }
 

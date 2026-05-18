@@ -17,18 +17,17 @@ class CourseController extends Controller
 
     /**
      * GET /api/courses
-     * Optional query param: ?path_id=1
+     * Optional query param: ?category=web-development
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Course::with('learningPath')
-                       ->where('is_published', true);
+        $query = Course::where('is_published', true);
 
-        if ($request->filled('path_id')) {
-            $query->where('learning_path_id', $request->integer('path_id'));
+        if ($request->filled('category')) {
+            $query->where('category', $request->string('category'));
         }
 
-        $courses = $query->orderBy('learning_path_id')
+        $courses = $query->orderBy('category')
                          ->orderBy('order_index')
                          ->get();
 
@@ -40,7 +39,7 @@ class CourseController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $course = Course::with(['learningPath', 'prerequisites'])->find($id);
+        $course = Course::with(['prerequisites'])->find($id);
 
         if (! $course || ! $course->is_published) {
             return $this->errorResponse('Course not found.', null, 404);

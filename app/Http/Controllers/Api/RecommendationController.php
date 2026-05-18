@@ -20,15 +20,18 @@ class RecommendationController extends Controller
      *
      * Flow:
      *  1. Find user's most recently completed course.
-     *  2. Call FastAPI ML service: GET /api/v1/recommend?title={title}
-     *  3. Map returned titles to DB courses.
-     *  4. Persist recommendation_logs.
+     *  2. If no completed course → cold-start fallback using user's interest.
+     *  3. Call FastAPI: GET /api/v1/recommend?title={title|interest}
+     *  4. Map returned titles to DB courses and persist recommendation_logs.
      *  5. Return enriched course details.
      */
     public function index(): JsonResponse
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
+
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
+        $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
 
         // ── Step 1: Find most recently completed course ────────────────────────
         $lastCompleted = $user->progress()
@@ -37,19 +40,28 @@ class RecommendationController extends Controller
                               ->latest('completed_at')
                               ->first();
 
-        if (! $lastCompleted || ! $lastCompleted->course) {
-            return $this->successResponse([], 'No completed courses found to base recommendations on.');
+        $sourceCourse  = $lastCompleted?->course ?? null;
+        $isColdStart   = $sourceCourse === null;
+
+        // ── Step 2: Determine the query title ─────────────────────────────────
+        if ($isColdStart) {
+            // No completed course → use the stored interest for cold-start
+            if (empty($user->interest)) {
+                return $this->successResponse(
+                    [],
+                    'No completed courses and no interest set. Please complete onboarding first.'
+                );
+            }
+
+            $queryTitle = $user->interest;
+        } else {
+            $queryTitle = $sourceCourse->title;
         }
 
-        $sourceCourse = $lastCompleted->course;
-
-        // ── Step 2: Call FastAPI ML service ───────────────────────────────────
-        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://localhost:8000'));
-        $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
-
+        // ── Step 3: Call FastAPI ML service ───────────────────────────────────
         try {
             $mlResponse = Http::timeout(10)
-                              ->get($mlUrl, ['title' => $sourceCourse->title]);
+                              ->get($mlUrl, ['title' => $queryTitle]);
 
             if (! $mlResponse->successful()) {
                 Log::warning('ML service returned non-200 response', [
@@ -69,7 +81,7 @@ class RecommendationController extends Controller
             return $this->successResponse([], 'No recommendations returned from ML service.');
         }
 
-        // ── Step 3 & 4: Map titles to DB courses and save logs ────────────────
+        // ── Step 4: Map titles to DB courses and persist logs ─────────────────
         $recommendations = [];
 
         foreach ($mlData as $item) {
@@ -88,24 +100,29 @@ class RecommendationController extends Controller
                 continue; // ML returned a title not in our DB — skip gracefully
             }
 
-            // Persist recommendation log
+            // Persist recommendation log (source_course_id is nullable for cold-start)
             RecommendationLog::create([
                 'user_id'               => $user->id,
-                'source_course_id'      => $sourceCourse->id,
+                'source_course_id'      => $sourceCourse?->id,   // null on cold-start
                 'recommended_course_id' => $course->id,
                 'similarity_score'      => $similarityScore,
                 'was_clicked'           => false,
             ]);
 
             $recommendations[] = [
-                'course'           => $course->load('learningPath'),
+                'course'           => $course,
                 'similarity_score' => $similarityScore,
             ];
         }
 
+        $message = $isColdStart
+            ? 'Cold-start recommendations retrieved using your interest.'
+            : 'Recommendations retrieved successfully.';
+
         return $this->successResponse([
             'source_course'   => $sourceCourse,
+            'is_cold_start'   => $isColdStart,
             'recommendations' => $recommendations,
-        ], 'Recommendations retrieved successfully.');
+        ], $message);
     }
 }

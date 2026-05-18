@@ -10,7 +10,7 @@ class Course extends Model
     use HasFactory;
 
     protected $fillable = [
-        'learning_path_id',
+        'category',
         'title',
         'description',
         'tags',
@@ -28,11 +28,6 @@ class Course extends Model
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
-
-    public function learningPath()
-    {
-        return $this->belongsTo(LearningPath::class);
-    }
 
     /**
      * Courses that are prerequisites FOR this course.

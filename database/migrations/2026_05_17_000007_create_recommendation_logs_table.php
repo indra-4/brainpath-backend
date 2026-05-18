@@ -12,8 +12,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('source_course_id')
+                  ->nullable()
                   ->constrained('courses')
-                  ->cascadeOnDelete();
+                  ->nullOnDelete();
             $table->foreignId('recommended_course_id')
                   ->constrained('courses')
                   ->cascadeOnDelete();

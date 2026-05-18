@@ -19,8 +19,7 @@ return new class extends Migration
             $table->string('password');
             $table->boolean('is_new_user')->default(true);
             $table->boolean('has_it_knowledge')->nullable();
-            // FK to learning_paths added as plain column; constraint applied in learning_paths migration
-            $table->unsignedBigInteger('current_path_id')->nullable();
+            $table->string('interest')->nullable(); // Cold-start: user's onboarding interest keyword
             $table->rememberToken();
             $table->timestamps();
         });

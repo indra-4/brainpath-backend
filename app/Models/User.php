@@ -17,7 +17,7 @@ class User extends Authenticatable
         'password',
         'is_new_user',
         'has_it_knowledge',
-        'current_path_id',
+        'interest',
     ];
 
     protected $hidden = [
@@ -37,28 +37,10 @@ class User extends Authenticatable
 
     // ── Relationships ─────────────────────────────────────────────────────────
 
-    public function currentPath()
-    {
-        return $this->belongsTo(LearningPath::class, 'current_path_id');
-    }
-
-    public function learningPaths()
-    {
-        return $this->belongsToMany(LearningPath::class, 'user_learning_paths')
-                    ->withPivot(['is_active', 'enrolled_at', 'completed_at'])
-                    ->withTimestamps();
-    }
-
-    public function userLearningPaths()
-    {
-        return $this->hasMany(UserLearningPath::class);
-    }
-
     public function progress()
     {
         return $this->hasMany(UserProgress::class);
     }
-
 
     public function recommendationLogs()
     {

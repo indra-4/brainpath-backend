@@ -40,6 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Recommendations (FastAPI ML bridge)
     Route::get('recommendations', [RecommendationController::class, 'index']);
 
-    // Chatbot
-    Route::post('chatbot', [ChatbotController::class, 'reply']);
+    // Chatbot (API Gateway → FastAPI LLM)
+    Route::post('chatbot', [ChatbotController::class, 'ask']);
 });

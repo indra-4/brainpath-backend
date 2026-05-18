@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('learning_path_id')->constrained()->cascadeOnDelete();
+            $table->string('category')->index(); // Replaces learning_path grouping
             $table->string('title');
             $table->text('description')->nullable();
             $table->json('tags')->nullable(); // JSONB on Postgres via json() type

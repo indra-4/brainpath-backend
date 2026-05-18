@@ -16,7 +16,8 @@ class ChatbotRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'message' => ['required', 'string', 'max:1000'],
+            'message'   => ['required', 'string', 'max:1000'],
+            'course_id' => ['nullable', 'integer', 'exists:courses,id'],
         ];
     }
 
