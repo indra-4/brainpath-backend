@@ -8,6 +8,7 @@ use App\Http\Requests\LoginRequest;
 use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
@@ -21,9 +22,9 @@ class AuthController extends Controller
     public function register(RegisterRequest $request): JsonResponse
     {
         $user = User::create([
-            'name'         => $request->name,
-            'email'        => $request->email,
-            'password'     => Hash::make($request->password),
+            'name'         => $request->input('name'),
+            'email'        => $request->input('email'),
+            'password'     => Hash::make($request->input('password')),
             'is_new_user'  => true,
         ]);
 
@@ -44,8 +45,7 @@ class AuthController extends Controller
             return $this->errorResponse('Invalid credentials. Please check your email and password.', null, 401);
         }
 
-        /** @var User $user */
-        $user  = Auth::user();
+        $user  = User::where('email', $request->input('email'))->firstOrFail();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return $this->successResponse([
@@ -57,11 +57,14 @@ class AuthController extends Controller
     /**
      * POST /api/auth/logout
      */
-    public function logout(): JsonResponse
+    public function logout(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = Auth::user();
-        $user->currentAccessToken()->delete();
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        
+        /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+        $token = $user->currentAccessToken();
+        $token->delete();
 
         return $this->successResponse(null, 'Logged out successfully.');
     }
