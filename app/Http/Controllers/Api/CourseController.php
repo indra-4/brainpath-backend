@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProgressRequest;
+use App\Http\Requests\CourseRequest;
 use App\Models\Course;
 use App\Models\UserProgress;
 use App\Traits\ApiResponse;
@@ -49,6 +50,69 @@ class CourseController extends Controller
     }
 
     /**
+     * POST /api/courses
+     */
+    public function store(CourseRequest $request): JsonResponse
+    {
+        $course = Course::create([
+            'title'            => $request->title,
+            'external_url'     => $request->external_url,
+            'description'      => $request->description,
+            'category'         => $request->category,
+            'level'            => $request->level,
+            'duration_text'    => $request->duration_text,
+            'tags'             => $request->tags ? json_encode($request->tags) : null,
+            'summary'          => $request->summary,
+            'learning_points'  => $request->learning_points ? json_encode($request->learning_points) : null,
+            'is_published'     => true,
+        ]);
+
+        return $this->successResponse($course, 'Course created successfully.', 201);
+    }
+
+    /**
+     * PUT /api/courses/{id}
+     */
+    public function update(CourseRequest $request, int $id): JsonResponse
+    {
+        $course = Course::find($id);
+
+        if (! $course) {
+            return $this->errorResponse('Course not found.', null, 404);
+        }
+
+        $course->update([
+            'title'            => $request->title,
+            'external_url'     => $request->external_url,
+            'description'      => $request->description,
+            'category'         => $request->category,
+            'level'            => $request->level,
+            'duration_text'    => $request->duration_text,
+            'tags'             => $request->tags ? json_encode($request->tags) : null,
+            'summary'          => $request->summary,
+            'learning_points'  => $request->learning_points ? json_encode($request->learning_points) : null,
+        ]);
+
+        return $this->successResponse($course, 'Course updated successfully.');
+    }
+
+    /**
+     * DELETE /api/courses/{id}
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $course = Course::find($id);
+
+        if (! $course) {
+            return $this->errorResponse('Course not found.', null, 404);
+        }
+
+        $course->delete();
+
+        return $this->successResponse(null, 'Course deleted successfully.');
+    }
+
+    /**
      * POST /api/courses/{id}/progress
      */
     public function updateProgress(ProgressRequest $request, int $id): JsonResponse
@@ -84,5 +148,32 @@ class CourseController extends Controller
         }
 
         return $this->successResponse($progress, 'Progress updated successfully.');
+    }
+
+    /**
+     * GET /api/courses/history
+     */
+    public function history(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        
+        $history = UserProgress::with('course')
+            ->where('user_id', $user->id)
+            ->orderBy('updated_at', 'desc')
+            ->get()
+            ->map(function ($progress) {
+                // Return course details injected with progress info
+                $data = $progress->course->toArray();
+                $data['progress'] = [
+                    'status' => $progress->status,
+                    'score' => $progress->score,
+                    'started_at' => $progress->started_at,
+                    'completed_at' => $progress->completed_at,
+                    'updated_at' => $progress->updated_at,
+                ];
+                return $data;
+            });
+
+        return $this->successResponse($history, 'History retrieved successfully.');
     }
 }

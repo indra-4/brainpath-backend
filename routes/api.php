@@ -32,8 +32,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Courses
     Route::prefix('courses')->group(function () {
+        Route::get('/history',        [CourseController::class, 'history']);
         Route::get('/',               [CourseController::class, 'index']);
         Route::get('/{id}',           [CourseController::class, 'show']);
+        Route::post('/',              [CourseController::class, 'store']);
+        Route::put('/{id}',           [CourseController::class, 'update']);
+        Route::delete('/{id}',        [CourseController::class, 'destroy']);
         Route::post('/{id}/progress', [CourseController::class, 'updateProgress']);
     });
 

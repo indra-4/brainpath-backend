@@ -28,8 +28,9 @@ class OnboardingController extends Controller
 
         // ── Step 1: Persist interest & complete onboarding ────────────────────
         $user->update([
-            'interest'    => $request->interest,
-            'is_new_user' => false,
+            'interest'         => $request->interest,
+            'has_it_knowledge' => $request->has_it_knowledge,
+            'is_new_user'      => false,
         ]);
 
         // ── Step 2: Cold-start — call FastAPI with the interest string ─────────

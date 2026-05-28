@@ -16,14 +16,29 @@ class RecommendationController extends Controller
     use ApiResponse;
 
     /**
+     * Map short interest keywords (from onboarding) to richer ML search terms.
+     */
+    private const INTEREST_SEARCH_MAP = [
+        'frontend'      => 'HTML CSS JavaScript web development frontend',
+        'backend'       => 'Laravel REST API backend server development',
+        'data'          => 'data analysis pandas visualization python',
+        'ai'            => 'machine learning deep learning artificial intelligence',
+        'cybersecurity' => 'cybersecurity ethical hacking penetration testing security',
+    ];
+
+    /**
+     * Map interest keywords to course category slugs in the database.
+     */
+    private const INTEREST_CATEGORY_MAP = [
+        'frontend'      => 'web-development',
+        'backend'       => 'web-development',
+        'data'          => 'data-science',
+        'ai'            => 'data-science',
+        'cybersecurity' => 'cybersecurity',
+    ];
+
+    /**
      * GET /api/recommendations
-     *
-     * Flow:
-     *  1. Find user's most recently completed course.
-     *  2. If no completed course → cold-start fallback using user's interest.
-     *  3. Call FastAPI: GET /api/v1/recommend?title={title|interest}
-     *  4. Map returned titles to DB courses and persist recommendation_logs.
-     *  5. Return enriched course details.
      */
     public function index(): JsonResponse
     {
@@ -45,74 +60,52 @@ class RecommendationController extends Controller
 
         // ── Step 2: Determine the query title ─────────────────────────────────
         if ($isColdStart) {
-            // No completed course → use the stored interest for cold-start
             if (empty($user->interest)) {
                 return $this->successResponse(
-                    [],
+                    ['source_course' => null, 'is_cold_start' => true, 'recommendations' => []],
                     'No completed courses and no interest set. Please complete onboarding first.'
                 );
             }
 
-            $queryTitle = $user->interest;
+            // Split multiple interests (e.g., "ai, data")
+            $rawInterests = array_filter(array_map('trim', explode(',', strtolower($user->interest))));
+            
+            $queryTitleArr = [];
+            foreach ($rawInterests as $interest) {
+                // Use the expanded search term if available, otherwise use raw interest
+                $queryTitleArr[] = self::INTEREST_SEARCH_MAP[$interest] ?? $interest;
+            }
+            $queryTitle = implode(' ', $queryTitleArr);
         } else {
             $queryTitle = $sourceCourse->title;
         }
 
         // ── Step 3: Call FastAPI ML service ───────────────────────────────────
-        try {
-            $mlResponse = Http::timeout(10)
-                              ->get($mlUrl, ['title' => $queryTitle]);
+        $recommendations = $this->callMlAndMapCourses($mlUrl, $queryTitle, $sourceCourse, $user);
 
-            if (! $mlResponse->successful()) {
-                Log::warning('ML service returned non-200 response', [
-                    'status' => $mlResponse->status(),
-                    'body'   => $mlResponse->body(),
-                ]);
-                return $this->errorResponse('Recommendation service is currently unavailable.', null, 503);
-            }
-
-            $mlData = $mlResponse->json(); // Expected: array of {title, similarity_score}
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::error('ML service connection failed', ['error' => $e->getMessage()]);
-            return $this->errorResponse('Could not connect to the recommendation service.', null, 503);
+        // ── Step 3b: If ML returned empty on cold-start, try expanded terms ──
+        if (empty($recommendations) && $isColdStart) {
+            // Not needed anymore since we already expand them above, but we keep the block 
+            // empty or just try without expanded terms if you want. Let's just pass here.
         }
 
-        if (empty($mlData) || empty($mlData['data'])) {
-            return $this->successResponse([], 'No recommendations returned from ML service.');
-        }
+        // ── Step 4: Final fallback — recommend from DB by category ────────────
+        if (empty($recommendations) && $isColdStart) {
+            $rawInterests = array_filter(array_map('trim', explode(',', strtolower($user->interest))));
+            $firstInterest = $rawInterests[0] ?? '';
+            $category    = self::INTEREST_CATEGORY_MAP[$firstInterest] ?? null;
 
-        // ── Step 4: Map titles to DB courses and persist logs ─────────────────
-        $recommendations = [];
+            $dbCourses = Course::where('is_published', true)
+                ->when($category, fn($q) => $q->where('category', $category))
+                ->limit(5)
+                ->get();
 
-        foreach ($mlData['data'] as $item) {
-            $title           = $item['title']            ?? null;
-            $similarityScore = (float) ($item['similarity_score'] ?? 0.0);
-
-            if (! $title) {
-                continue;
+            foreach ($dbCourses as $course) {
+                $recommendations[] = [
+                    'course'           => $course,
+                    'similarity_score' => 0.5, // default score for DB fallback
+                ];
             }
-
-            $course = Course::where('title', $title)
-                            ->where('is_published', true)
-                            ->first();
-
-            if (! $course) {
-                continue; // ML returned a title not in our DB — skip gracefully
-            }
-
-            // Persist recommendation log (source_course_id is nullable for cold-start)
-            RecommendationLog::create([
-                'user_id'               => $user->id,
-                'source_course_id'      => $sourceCourse?->id,   // null on cold-start
-                'recommended_course_id' => $course->id,
-                'similarity_score'      => $similarityScore,
-                'was_clicked'           => false,
-            ]);
-
-            $recommendations[] = [
-                'course'           => $course,
-                'similarity_score' => $similarityScore,
-            ];
         }
 
         $message = $isColdStart
@@ -125,4 +118,67 @@ class RecommendationController extends Controller
             'recommendations' => $recommendations,
         ], $message);
     }
+
+    /**
+     * Call ML service and map returned titles to DB courses.
+     */
+    private function callMlAndMapCourses(string $mlUrl, string $queryTitle, ?Course $sourceCourse, $user): array
+    {
+        try {
+            $mlResponse = Http::timeout(10)->get($mlUrl, ['title' => $queryTitle]);
+
+            if (! $mlResponse->successful()) {
+                Log::warning('ML service returned non-200 response', [
+                    'status' => $mlResponse->status(),
+                    'body'   => $mlResponse->body(),
+                ]);
+                return [];
+            }
+
+            $mlData = $mlResponse->json();
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('ML service connection failed', ['error' => $e->getMessage()]);
+            return [];
+        }
+
+        if (empty($mlData) || empty($mlData['recommendations'])) {
+            return [];
+        }
+
+        $recommendations = [];
+
+        foreach ($mlData['recommendations'] as $item) {
+            $title           = $item['title']            ?? null;
+            $similarityScore = (float) ($item['cosine_score'] ?? 0.0);
+
+            if (! $title) {
+                continue;
+            }
+
+            $course = Course::where('title', $title)
+                            ->where('is_published', true)
+                            ->first();
+
+            if (! $course) {
+                continue;
+            }
+
+            // Persist recommendation log
+            RecommendationLog::create([
+                'user_id'               => $user->id,
+                'source_course_id'      => $sourceCourse?->id,
+                'recommended_course_id' => $course->id,
+                'similarity_score'      => $similarityScore,
+                'was_clicked'           => false,
+            ]);
+
+            $recommendations[] = [
+                'course'           => $course,
+                'similarity_score' => $similarityScore,
+            ];
+        }
+
+        return $recommendations;
+    }
 }
+
