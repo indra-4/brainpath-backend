@@ -18,13 +18,19 @@ class Course extends Model
         'duration_minutes',
         'skills',
         'is_published',
+        'external_url',
+        'level',
+        'summary',
+        'learning_points',
+        'duration_text',
     ];
 
     protected function casts(): array
     {
         return [
-            'tags'         => 'array',
-            'is_published' => 'boolean',
+            'tags'            => 'array',
+            'is_published'    => 'boolean',
+            'learning_points' => 'array',
         ];
     }
 

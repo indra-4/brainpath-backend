@@ -41,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/progress', [CourseController::class, 'updateProgress']);
     });
 
+    // Admin Analytics
+    Route::get('admin/analytics', [CourseController::class, 'adminAnalytics']);
+
     // Recommendations (FastAPI ML bridge)
     Route::get('recommendations', [RecommendationController::class, 'index']);
 

@@ -14,7 +14,7 @@ class CourseRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -37,8 +37,48 @@ class CourseRequest extends FormRequest
         ];
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('tags')) {
+            $this->merge([
+                'tags' => $this->normalizeArrayInput($this->tags),
+            ]);
+        }
+
+        if ($this->has('learning_points')) {
+            $this->merge([
+                'learning_points' => $this->normalizeArrayInput($this->learning_points),
+            ]);
+        }
+    }
+
+    private function normalizeArrayInput($value): ?array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+            // Fallback: split by comma or newline if it's a plain string
+            return array_filter(array_map('trim', preg_split('/[\n,]+/', $value)));
+        }
+
+        return is_array($value) ? $value : null;
+    }
+
     protected function failedValidation(Validator $validator): never
     {
+        $payload = $this->all();
+        \Illuminate\Support\Facades\Log::info('Validation failed payload: ' . json_encode([
+            'errors' => $validator->errors(),
+            'payload' => $payload,
+            'learning_points_type' => gettype($payload['learning_points'] ?? null)
+        ]));
+        
         throw new HttpResponseException(response()->json([
             'success' => false,
             'data'    => $validator->errors(),
