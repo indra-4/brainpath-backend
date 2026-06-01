@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\RecommendationLog;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -45,8 +46,7 @@ class RecommendationController extends Controller
         /** @var \App\Models\User $user */
         $user = Auth::user();
 
-        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
-        $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
+        $mlUrl = $this->mlRecommendationUrl();
 
         // ── Step 1: Find most recently completed course ────────────────────────
         $lastCompleted = $user->progress()
@@ -67,15 +67,7 @@ class RecommendationController extends Controller
                 );
             }
 
-            // Split multiple interests (e.g., "ai, data")
-            $rawInterests = array_filter(array_map('trim', explode(',', strtolower($user->interest))));
-            
-            $queryTitleArr = [];
-            foreach ($rawInterests as $interest) {
-                // Use the expanded search term if available, otherwise use raw interest
-                $queryTitleArr[] = self::INTEREST_SEARCH_MAP[$interest] ?? $interest;
-            }
-            $queryTitle = implode(' ', $queryTitleArr);
+            $queryTitle = $this->buildInterestQueryTitle($user->interest);
         } else {
             $queryTitle = $sourceCourse->title;
         }
@@ -91,21 +83,7 @@ class RecommendationController extends Controller
 
         // ── Step 4: Final fallback — recommend from DB by category ────────────
         if (empty($recommendations) && $isColdStart) {
-            $rawInterests = array_filter(array_map('trim', explode(',', strtolower($user->interest))));
-            $firstInterest = $rawInterests[0] ?? '';
-            $category    = self::INTEREST_CATEGORY_MAP[$firstInterest] ?? null;
-
-            $dbCourses = Course::where('is_published', true)
-                ->when($category, fn($q) => $q->where('category', $category))
-                ->limit(5)
-                ->get();
-
-            foreach ($dbCourses as $course) {
-                $recommendations[] = [
-                    'course'           => $course,
-                    'similarity_score' => 0.5, // default score for DB fallback
-                ];
-            }
+            $recommendations = $this->fallbackRecommendationsByInterest($user->interest);
         }
 
         $message = $isColdStart
@@ -120,9 +98,49 @@ class RecommendationController extends Controller
     }
 
     /**
+     * POST /api/guest/recommendations
+     */
+    public function guest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'has_it_knowledge' => ['nullable', 'boolean'],
+            'interest'         => ['required', 'string', 'max:255'],
+            'learning_goal'    => ['nullable', 'string', 'max:255'],
+            'note'             => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $interest = $validated['interest'];
+        $queryTitle = $this->buildInterestQueryTitle($interest);
+
+        $recommendations = $this->callMlAndMapCourses(
+            $this->mlRecommendationUrl(),
+            $queryTitle,
+            null,
+            null,
+            false
+        );
+
+        if (empty($recommendations)) {
+            $recommendations = $this->fallbackRecommendationsByInterest($interest);
+        }
+
+        return $this->successResponse([
+            'source_course'   => null,
+            'is_cold_start'   => true,
+            'recommendations' => $recommendations,
+        ], 'Guest recommendations retrieved successfully.');
+    }
+
+    /**
      * Call ML service and map returned titles to DB courses.
      */
-    private function callMlAndMapCourses(string $mlUrl, string $queryTitle, ?Course $sourceCourse, $user): array
+    private function callMlAndMapCourses(
+        string $mlUrl,
+        string $queryTitle,
+        ?Course $sourceCourse,
+        $user = null,
+        bool $shouldLog = true
+    ): array
     {
         try {
             $mlResponse = Http::timeout(10)->get($mlUrl, ['title' => $queryTitle]);
@@ -163,14 +181,15 @@ class RecommendationController extends Controller
                 continue;
             }
 
-            // Persist recommendation log
-            RecommendationLog::create([
-                'user_id'               => $user->id,
-                'source_course_id'      => $sourceCourse?->id,
-                'recommended_course_id' => $course->id,
-                'similarity_score'      => $similarityScore,
-                'was_clicked'           => false,
-            ]);
+            if ($shouldLog && $user) {
+                RecommendationLog::create([
+                    'user_id'               => $user->id,
+                    'source_course_id'      => $sourceCourse?->id,
+                    'recommended_course_id' => $course->id,
+                    'similarity_score'      => $similarityScore,
+                    'was_clicked'           => false,
+                ]);
+            }
 
             $recommendations[] = [
                 'course'           => $course,
@@ -180,5 +199,44 @@ class RecommendationController extends Controller
 
         return $recommendations;
     }
-}
 
+    private function mlRecommendationUrl(): string
+    {
+        $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
+
+        return rtrim($mlBaseUrl, '/') . '/api/v1/recommend';
+    }
+
+    private function buildInterestQueryTitle(string $interest): string
+    {
+        $queryTitleArr = [];
+
+        foreach ($this->parseInterests($interest) as $rawInterest) {
+            $queryTitleArr[] = self::INTEREST_SEARCH_MAP[$rawInterest] ?? $rawInterest;
+        }
+
+        return implode(' ', $queryTitleArr);
+    }
+
+    private function fallbackRecommendationsByInterest(string $interest): array
+    {
+        $rawInterests = $this->parseInterests($interest);
+        $firstInterest = $rawInterests[0] ?? '';
+        $category = self::INTEREST_CATEGORY_MAP[$firstInterest] ?? null;
+
+        return Course::where('is_published', true)
+            ->when($category, fn($q) => $q->where('category', $category))
+            ->limit(5)
+            ->get()
+            ->map(fn($course) => [
+                'course'           => $course,
+                'similarity_score' => 0.5,
+            ])
+            ->all();
+    }
+
+    private function parseInterests(string $interest): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', strtolower($interest)))));
+    }
+}

@@ -21,6 +21,8 @@ Route::prefix('auth')->group(function () {
     Route::post('login',    [AuthController::class, 'login']);
 });
 
+Route::post('guest/recommendations', [RecommendationController::class, 'guest']);
+
 // ── Protected Routes (Sanctum) ─────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
 
