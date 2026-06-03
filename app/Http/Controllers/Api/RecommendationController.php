@@ -46,7 +46,7 @@ class RecommendationController extends Controller
         $user = Auth::user();
 
         $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
-        $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
+        $mlUrl     = $mlBaseUrl . '/api/v1/recommendations';
 
         // ── Step 1: Find most recently completed course ────────────────────────
         $lastCompleted = $user->progress()
