@@ -26,6 +26,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Auth
     Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::get('me', [AuthController::class, 'me']);
 
     // Onboarding
     Route::post('onboarding/complete', [OnboardingController::class, 'complete']);

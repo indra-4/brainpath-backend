@@ -35,7 +35,7 @@ class OnboardingController extends Controller
 
         // ── Step 2: Cold-start — call FastAPI with the interest string ─────────
         $mlBaseUrl = config('services.ml.url', env('ML_SERVICE_URL', 'http://127.0.0.1:8001'));
-        $mlUrl     = $mlBaseUrl . '/api/v1/recommend';
+        $mlUrl     = $mlBaseUrl . '/api/v1/recommendations';
 
         try {
             $mlResponse = Http::timeout(10)
