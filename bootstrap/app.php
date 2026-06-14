@@ -5,7 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
-return Application::configure(basePath: dirname(__DIR__))
+$app = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',      // ← registers /api prefix
@@ -30,9 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })->create();
 
-// Vercel Serverless storage handler (Vercel is read-only except /tmp)
-if (isset($_ENV['VERCEL']) || env('VERCEL') == "1") {
+// Vercel Serverless: redirect storage & override session/cache to non-DB drivers
+if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     $app->useStoragePath(sys_get_temp_dir() . '/storage');
+    putenv('SESSION_DRIVER=cookie');
+    putenv('CACHE_STORE=array');
+    putenv('QUEUE_CONNECTION=sync');
 }
 
 return $app;
