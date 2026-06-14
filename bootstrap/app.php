@@ -29,3 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
     })->create();
+
+// Vercel Serverless storage handler (Vercel is read-only except /tmp)
+if (isset($_ENV['VERCEL']) || env('VERCEL') == "1") {
+    $app->useStoragePath('/tmp/storage');
+}
+
+return $app;

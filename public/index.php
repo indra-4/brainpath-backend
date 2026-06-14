@@ -13,6 +13,17 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 // Register the Composer autoloader...
 require __DIR__.'/../vendor/autoload.php';
 
+// Create Vercel temp directories
+if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
+    $dirs = ['framework/views', 'framework/cache', 'framework/sessions', 'logs', 'app'];
+    foreach ($dirs as $dir) {
+        $path = '/tmp/storage/' . $dir;
+        if (!is_dir($path)) {
+            mkdir($path, 0777, true);
+        }
+    }
+}
+
 // Bootstrap Laravel and handle the request...
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';
