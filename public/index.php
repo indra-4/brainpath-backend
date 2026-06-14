@@ -15,18 +15,19 @@ require __DIR__.'/../vendor/autoload.php';
 
 // Create Vercel temp directories
 if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
+    $baseTmp = sys_get_temp_dir() . '/storage';
     $dirs = ['framework/views', 'framework/cache', 'framework/sessions', 'logs', 'app', 'bootstrap/cache'];
     foreach ($dirs as $dir) {
-        $path = '/tmp/storage/' . $dir;
+        $path = $baseTmp . '/' . $dir;
         if (!is_dir($path)) {
             mkdir($path, 0777, true);
         }
     }
-    putenv('APP_SERVICES_CACHE=/tmp/storage/bootstrap/cache/services.php');
-    putenv('APP_PACKAGES_CACHE=/tmp/storage/bootstrap/cache/packages.php');
-    putenv('APP_CONFIG_CACHE=/tmp/storage/bootstrap/cache/config.php');
-    putenv('APP_ROUTES_CACHE=/tmp/storage/bootstrap/cache/routes.php');
-    putenv('APP_EVENTS_CACHE=/tmp/storage/bootstrap/cache/events.php');
+    putenv('APP_SERVICES_CACHE='.$baseTmp.'/bootstrap/cache/services.php');
+    putenv('APP_PACKAGES_CACHE='.$baseTmp.'/bootstrap/cache/packages.php');
+    putenv('APP_CONFIG_CACHE='.$baseTmp.'/bootstrap/cache/config.php');
+    putenv('APP_ROUTES_CACHE='.$baseTmp.'/bootstrap/cache/routes.php');
+    putenv('APP_EVENTS_CACHE='.$baseTmp.'/bootstrap/cache/events.php');
     putenv('LOG_CHANNEL=stderr');
     putenv('APP_DEBUG=true');
 }
