@@ -45,14 +45,16 @@ if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     putenv('CACHE_STORE=array');
     putenv('QUEUE_CONNECTION=sync');
     
-    // Inject Neon PostgreSQL Credentials (with SNI workaround in DB_DATABASE DSN)
+    // Inject Neon PostgreSQL Credentials robustly using DB_URL
+    $dbUrl = 'pgsql://neondb_owner:npg_k2vErFL1OICS@ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require&options=endpoint%3Dep-noisy-night-aoaqai76';
+    
+    $_SERVER['DB_CONNECTION'] = 'pgsql';
+    $_ENV['DB_CONNECTION'] = 'pgsql';
     putenv('DB_CONNECTION=pgsql');
-    putenv('DB_HOST=ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech');
-    putenv('DB_PORT=5432');
-    putenv('DB_DATABASE=neondb;options=endpoint=ep-noisy-night-aoaqai76');
-    putenv('DB_USERNAME=neondb_owner');
-    putenv('DB_PASSWORD=npg_k2vErFL1OICS');
-    putenv('DB_SSLMODE=require');
+
+    $_SERVER['DB_URL'] = $dbUrl;
+    $_ENV['DB_URL'] = $dbUrl;
+    putenv('DB_URL=' . $dbUrl);
 }
 
 return $app;
