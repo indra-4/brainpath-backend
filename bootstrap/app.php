@@ -45,16 +45,17 @@ if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     putenv('CACHE_STORE=array');
     putenv('QUEUE_CONNECTION=sync');
     
-    // Inject Neon PostgreSQL Credentials robustly using DB_URL
-    $dbUrl = 'pgsql://neondb_owner:npg_k2vErFL1OICS@ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech:5432/neondb?sslmode=require&options=endpoint%3Dep-noisy-night-aoaqai76';
-    
-    $_SERVER['DB_CONNECTION'] = 'pgsql';
+    // Inject Neon PostgreSQL Credentials robustly using $_ENV
     $_ENV['DB_CONNECTION'] = 'pgsql';
-    putenv('DB_CONNECTION=pgsql');
-
-    $_SERVER['DB_URL'] = $dbUrl;
-    $_ENV['DB_URL'] = $dbUrl;
-    putenv('DB_URL=' . $dbUrl);
+    $_ENV['DB_HOST'] = 'ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech';
+    $_ENV['DB_PORT'] = '5432';
+    $_ENV['DB_DATABASE'] = 'neondb;options=endpoint=ep-noisy-night-aoaqai76';
+    $_ENV['DB_USERNAME'] = 'neondb_owner';
+    $_ENV['DB_PASSWORD'] = 'npg_k2vErFL1OICS';
+    $_ENV['DB_SSLMODE'] = 'require';
+    
+    // Unset DB_URL to prevent overrides
+    unset($_ENV['DB_URL'], $_SERVER['DB_URL']);
 }
 
 return $app;
