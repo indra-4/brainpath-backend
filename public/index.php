@@ -27,6 +27,8 @@ if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     $_ENV['APP_CONFIG_CACHE'] = '/tmp/storage/bootstrap/cache/config.php';
     $_ENV['APP_ROUTES_CACHE'] = '/tmp/storage/bootstrap/cache/routes.php';
     $_ENV['APP_EVENTS_CACHE'] = '/tmp/storage/bootstrap/cache/events.php';
+    $_ENV['LOG_CHANNEL'] = 'stderr';
+    $_ENV['APP_DEBUG'] = 'true';
 }
 
 // Bootstrap Laravel and handle the request...
