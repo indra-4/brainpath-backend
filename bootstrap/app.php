@@ -40,7 +40,16 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
 // Vercel Serverless: redirect storage & override session/cache to non-DB drivers
 if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
-    $app->useStoragePath(sys_get_temp_dir() . '/storage');
+    $tempStorage = sys_get_temp_dir() . '/storage';
+    $app->useStoragePath($tempStorage);
+    
+    // Ensure all required temp directories exist so Laravel doesn't crash on error rendering
+    foreach (['/framework/views', '/framework/cache', '/framework/sessions', '/logs', '/app'] as $dir) {
+        if (!is_dir($tempStorage . $dir)) {
+            @mkdir($tempStorage . $dir, 0777, true);
+        }
+    }
+
     putenv('SESSION_DRIVER=cookie');
     putenv('CACHE_STORE=array');
     putenv('QUEUE_CONNECTION=sync');
