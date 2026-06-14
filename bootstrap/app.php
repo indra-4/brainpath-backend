@@ -28,6 +28,14 @@ $app = Application::configure(basePath: dirname(__DIR__))
                 ], 401);
             }
         });
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => explode("\n", $e->getTraceAsString())
+            ], 500);
+        });
     })->create();
 
 // Vercel Serverless: redirect storage & override session/cache to non-DB drivers
