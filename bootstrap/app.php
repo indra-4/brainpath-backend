@@ -45,17 +45,17 @@ if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     putenv('CACHE_STORE=array');
     putenv('QUEUE_CONNECTION=sync');
     
-    // Inject Neon PostgreSQL Credentials robustly using $_ENV
+    // Inject Neon PostgreSQL Credentials (with SNI workaround injected via SSLMODE)
     $_ENV['DB_CONNECTION'] = 'pgsql';
     $_ENV['DB_HOST'] = 'ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech';
     $_ENV['DB_PORT'] = '5432';
-    $_ENV['DB_DATABASE'] = 'neondb;options=endpoint=ep-noisy-night-aoaqai76';
+    $_ENV['DB_DATABASE'] = 'neondb';
     $_ENV['DB_USERNAME'] = 'neondb_owner';
     $_ENV['DB_PASSWORD'] = 'npg_k2vErFL1OICS';
-    $_ENV['DB_SSLMODE'] = 'require';
     
-    // Unset DB_URL to prevent overrides
-    unset($_ENV['DB_URL'], $_SERVER['DB_URL']);
+    // Laravel's PostgresConnector ignores 'options' config but appends 'sslmode'.
+    // We hack the DSN by injecting the options directly into the sslmode string!
+    $_ENV['DB_SSLMODE'] = "require;options='endpoint=ep-noisy-night-aoaqai76'";
 }
 
 return $app;
