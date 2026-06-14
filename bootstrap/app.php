@@ -44,6 +44,14 @@ if (isset($_ENV['VERCEL']) || getenv('VERCEL') == "1") {
     putenv('SESSION_DRIVER=cookie');
     putenv('CACHE_STORE=array');
     putenv('QUEUE_CONNECTION=sync');
+    
+    // Inject Neon PostgreSQL Credentials
+    putenv('DB_CONNECTION=pgsql');
+    putenv('DB_HOST=ep-noisy-night-aoaqai76.c-2.ap-southeast-1.aws.neon.tech');
+    putenv('DB_PORT=5432');
+    putenv('DB_DATABASE=neondb');
+    putenv('DB_USERNAME=neondb_owner');
+    putenv('DB_PASSWORD=npg_k2vErFL1OICS');
 }
 
 return $app;
