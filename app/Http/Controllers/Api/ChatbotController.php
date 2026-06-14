@@ -39,6 +39,8 @@ class ChatbotController extends Controller
 
         try {
             $mlResponse = Http::timeout(30)
+                              ->withoutVerifying()
+                              ->withHeaders(['X-API-Key' => env('ML_API_KEY')])
                               ->post($mlUrl, $payload);
 
             if (! $mlResponse->successful()) {

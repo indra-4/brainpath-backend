@@ -125,7 +125,11 @@ class RecommendationController extends Controller
     private function callMlAndMapCourses(string $mlUrl, string $queryTitle, ?Course $sourceCourse, $user): array
     {
         try {
-            $mlResponse = Http::timeout(10)->get($mlUrl, ['title' => $queryTitle]);
+            $userLevel = $user && $user->has_it_knowledge ? 'menengah' : 'pemula';
+            $mlResponse = Http::timeout(10)->withoutVerifying()->withHeaders(['X-API-Key' => env('ML_API_KEY')])->get($mlUrl, [
+                'title' => $queryTitle,
+                'level' => $userLevel
+            ]);
 
             if (! $mlResponse->successful()) {
                 Log::warning('ML service returned non-200 response', [

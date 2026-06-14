@@ -38,8 +38,14 @@ class OnboardingController extends Controller
         $mlUrl     = $mlBaseUrl . '/api/v1/recommendations';
 
         try {
+            $userLevel = $request->has_it_knowledge ? 'menengah' : 'pemula';
             $mlResponse = Http::timeout(10)
-                              ->get($mlUrl, ['title' => $request->interest]);
+                              ->withoutVerifying()
+                              ->withHeaders(['X-API-Key' => env('ML_API_KEY')])
+                              ->get($mlUrl, [
+                                  'title' => $request->interest,
+                                  'level' => $userLevel
+                              ]);
 
             if (! $mlResponse->successful()) {
                 Log::warning('ML service cold-start returned non-200', [
