@@ -8,6 +8,7 @@ use App\Models\RecommendationLog;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -124,22 +125,32 @@ class RecommendationController extends Controller
      */
     private function callMlAndMapCourses(string $mlUrl, string $queryTitle, ?Course $sourceCourse, $user): array
     {
-        try {
-            $userLevel = $user && $user->has_it_knowledge ? 'menengah' : 'pemula';
-            $mlResponse = Http::timeout(10)->withoutVerifying()->withHeaders(['X-API-Key' => env('ML_API_KEY')])->get($mlUrl, [
-                'title' => $queryTitle,
-                'level' => $userLevel
-            ]);
+        $userLevel = $user && $user->has_it_knowledge ? 'menengah' : 'pemula';
+        $cacheKey = 'ml_recommendations_' . md5($queryTitle . '_' . $userLevel);
 
-            if (! $mlResponse->successful()) {
-                Log::warning('ML service returned non-200 response', [
-                    'status' => $mlResponse->status(),
-                    'body'   => $mlResponse->body(),
+        try {
+            $mlData = Cache::remember($cacheKey, now()->addHours(24), function () use ($mlUrl, $queryTitle, $userLevel) {
+                $mlResponse = Http::timeout(10)->withoutVerifying()->withHeaders(['X-API-Key' => env('ML_API_KEY')])->get($mlUrl, [
+                    'title' => $queryTitle,
+                    'level' => $userLevel
                 ]);
+
+                if (! $mlResponse->successful()) {
+                    Log::warning('ML service returned non-200 response', [
+                        'status' => $mlResponse->status(),
+                        'body'   => $mlResponse->body(),
+                    ]);
+                    return null;
+                }
+
+                return $mlResponse->json();
+            });
+
+            if ($mlData === null) {
+                // If it failed and returned null, remove it from cache so it can be retried next time
+                Cache::forget($cacheKey);
                 return [];
             }
-
-            $mlData = $mlResponse->json();
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('ML service connection failed', ['error' => $e->getMessage()]);
             return [];

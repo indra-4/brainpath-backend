@@ -7,6 +7,7 @@ use App\Http\Requests\OnboardingRequest;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -39,27 +40,36 @@ class OnboardingController extends Controller
 
         try {
             $userLevel = $request->has_it_knowledge ? 'menengah' : 'pemula';
-            $mlResponse = Http::timeout(10)
-                              ->withoutVerifying()
-                              ->withHeaders(['X-API-Key' => env('ML_API_KEY')])
-                              ->get($mlUrl, [
-                                  'title' => $request->interest,
-                                  'level' => $userLevel
-                              ]);
+            $cacheKey  = 'ml_recommendations_' . md5($request->interest . '_' . $userLevel);
 
-            if (! $mlResponse->successful()) {
-                Log::warning('ML service cold-start returned non-200', [
-                    'status' => $mlResponse->status(),
-                    'body'   => $mlResponse->body(),
-                ]);
+            $mlJson = Cache::remember($cacheKey, now()->addHours(24), function () use ($mlUrl, $request, $userLevel) {
+                $mlResponse = Http::timeout(10)
+                                  ->withoutVerifying()
+                                  ->withHeaders(['X-API-Key' => env('ML_API_KEY')])
+                                  ->get($mlUrl, [
+                                      'title' => $request->interest,
+                                      'level' => $userLevel
+                                  ]);
 
+                if (! $mlResponse->successful()) {
+                    Log::warning('ML service cold-start returned non-200', [
+                        'status' => $mlResponse->status(),
+                        'body'   => $mlResponse->body(),
+                    ]);
+                    return null;
+                }
+
+                return $mlResponse->json();
+            });
+
+            if ($mlJson === null) {
+                Cache::forget($cacheKey);
                 return $this->successResponse([
                     'user'            => $user->fresh(),
                     'recommendations' => [],
                 ], 'Onboarding completed. Recommendation service is currently unavailable.');
             }
 
-            $mlJson           = $mlResponse->json();
             $recommendations  = $mlJson['data'] ?? $mlJson ?? [];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('ML service connection failed during onboarding cold-start', [
